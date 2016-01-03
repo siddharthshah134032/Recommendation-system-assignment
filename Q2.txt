@@ -1,0 +1,35 @@
+
+	import java.lang.Math.{pow, sqrt}
+	import breeze.linalg._
+
+	val movie_id=readLine("Enter the movie_id::")
+
+	val logFile = "/sxs134032/S1/itemusermat";
+	val lines = sc.textFile(logFile);
+	val split_lines = lines.map(line=>line.split(" "));
+
+	val movie_genre_file = "/sxs134032/S1/movies.dat";
+	val movie_lines = sc.textFile(movie_genre_file);
+	val movie_split_lines = movie_lines.map(line=>line.split("::"));
+	val movieid_title_gnere = movie_split_lines.map(x => (x(0),x.slice(1,x.length)));
+
+	val movie_id_ratings_string = split_lines.map(x=>(x(0),x.slice(1,x.length)));
+	val movie_id_ratings_double = movie_id_ratings_string.map(x=> (x._1,x._2.map(_.toDouble)));
+	val movie_id_sum = movie_id_ratings_double.map(x=>(x._1,x._2.reduceLeft(_+_)));
+	val moveid_square_sum = movie_id_ratings_double.map(x => (x._1,x._2.map(rating => Math.pow(rating, 2)).sum));
+	val movie_x = movie_id_ratings_double.filter(x => x._1.equals(movie_id)).first;
+	val movie_x_sum = movie_id_sum.filter(x => x._1.equals(movie_id)).first._2;
+	val movie_x_square_sum = moveid_square_sum.filter(x => x._1.equals(movie_id)).first._2;
+	val length_of_vector = movie_x._2.length;
+	val movie_x_denseVector = new DenseVector(movie_x._2);
+	val movieid_dotproduct = movie_id_ratings_double.map(x=>(x._1,new DenseVector(x._2).dot(movie_x_denseVector)));
+	val joined_value = movie_id_sum.join(moveid_square_sum).join(movieid_dotproduct);
+	val movieid_similarity = joined_value.map(x=> (x._1, (length_of_vector * x._2._2-movie_x_sum * x._2._1._1)/(sqrt(((length_of_vector * movie_x_square_sum)-(movie_x_sum * movie_x_sum))*((length_of_vector * x._2._1._2)-(x._2._1._1 * x._2._1._1))))));
+	val sorted_movieid_similarity = movieid_similarity.sortBy(-_._2);
+	val top6_similar_movies = sorted_movieid_similarity.take(6);
+	val top5_similar_movies = top6_similar_movies.slice(1,top6_similar_movies.length);
+	val top5_similar_movies_rdd = sc.parallelize(top5_similar_movies);
+
+	val joined_with_genre = movieid_title_gnere.join(top5_similar_movies_rdd);
+	val final_key_value_rdd = joined_with_genre.map(x=> (x._1,(x._2._1(0),x._2._1(1))));
+	val top5_simililar_after_join = final_key_value_rdd.take(5).foreach(println);
